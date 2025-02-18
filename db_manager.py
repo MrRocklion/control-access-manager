@@ -52,3 +52,57 @@ class SqliteManager(threading.Thread):
                 print("Suscripción insertada correctamente.")
         except sqlite3.Error as e:
             print("Error al insertar la suscripción:", e)
+
+    def get_subscription_by_user_id(self, user_id):
+        """Busca en la tabla suscripciones la fila que coincida con el user_id proporcionado."""
+        try:
+            with sqlite3.connect('app.db') as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT * FROM suscripciones WHERE user_id = ?
+                ''', (user_id,))
+                
+                subscription = cursor.fetchone()  # Obtener la primera coincidencia
+
+                if subscription:
+                    # # Convertir la tupla en un diccionario para una mejor presentación
+                    subscription_dict = {
+                        "id": subscription[0],
+                        "start_date": subscription[1],
+                        "end_date": subscription[2],
+                        "duration": subscription[3],
+                        "entries": subscription[4],
+                        "user_id": subscription[5]
+                    }
+                    return subscription_dict
+                else:
+                    return None  # No se encontró suscripción para ese user_id
+
+        except sqlite3.Error as e:
+            print("Error al buscar la suscripción:", e)
+            return False
+    def update_subscription_dates(self, subscription_id, new_start_date, new_end_date):
+        """Actualiza start_date y end_date en la suscripción con el ID proporcionado."""
+        try:
+            with sqlite3.connect('app.db') as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    UPDATE suscripciones 
+                    SET start_date = ?, end_date = ? 
+                    WHERE id = ?
+                ''', (new_start_date, new_end_date, subscription_id))
+                
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    print(f"Suscripción {subscription_id} actualizada correctamente.")
+                    return True
+                else:
+                    print(f"No se encontró la suscripción con ID {subscription_id}.")
+                    return False
+
+        except sqlite3.Error as e:
+            print("Error al actualizar la suscripción:", e)
+            return False
+

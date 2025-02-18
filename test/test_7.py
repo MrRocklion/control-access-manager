@@ -1,16 +1,13 @@
-from flask import Flask, request, jsonify, abort,render_template
-from datetime import datetime, timezone
-from dateutil import parser
 import jwt
 import json
 import requests
 from db_manager import SqliteManager
 from dotenv import load_dotenv
 import os
-
-app = Flask(__name__)
-
-
+load_dotenv()
+tenant = os.getenv("TENANT_ID")
+api_url = os.getenv("API_URL")
+api_port = os.getenv("API_PORT")
 def get_token():
     url = f"http://{api_url}:{api_port}/api/auth/login"
 
@@ -78,64 +75,24 @@ def get_suscriptions(token):
     else:
         print(f"Error en la solicitud: {response.status_code}")
         return []
-def validate_with_backend(user_id):
-    return False
+
     
 def update_db(suscriptions):
     for _sub in suscriptions:
         formated_sub = {"start_date":_sub['start_date'],"end_date":_sub['end_date'],"duration":_sub['duration'],"entries":_sub['entries'],"user_id":_sub['user']['id']}
         data_exist = database.get_subscription_by_user_id(formated_sub['user_id'])
-        if data_exist != None:
+        if data_exist:
             print("ya existe")
             database.update_subscription_dates(formated_sub['user_id'],formated_sub['start_date'],formated_sub['end_date'])
         else:
             print("no existe, se procede a registrar")
             database.insert_subscription(formated_sub)
+    
 
-@app.route('/', methods=['GET', 'POST'])
-def home():
-    result = None
-    return render_template('home.html', result=result)
-
-
-
-@app.route('/api/validate', methods=['POST'])
-def validate_suscription():
-    if not request.is_json:
-        abort(400, description="Se esperaba un JSON válido")
-
-    data = request.get_json()
-    if 'operation' not in data:
-        abort(400, description="Falta el parámetro 'operation' en la solicitud")
-    if data['operation'] == "validate_user":
-        try:
-            id_target = data['user_id']
-            data_exist = database.get_subscription_by_user_id(id_target)
-            fecha_objetivo = parser.isoparse(data_exist['end_date'])
-            fecha_actual = datetime.now(timezone.utc)
-            if fecha_actual <= fecha_objetivo:
-                return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":True}), 200
-            else:
-                flag = validate_with_backend()
-                if flag:
-                    return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":True}), 200
-                else:
-                    return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":False}), 200
-            
-        except Exception as e:
-            abort(500, description=f"Error al ejecutar la operación: {str(e)}")
-  
 
 if __name__ == "__main__":
-    try:
-        load_dotenv()
-        tenant = os.getenv("TENANT_ID")
-        api_url = os.getenv("API_URL")
-        api_port = os.getenv("API_PORT")
-        database = SqliteManager()
-        jwt = get_token()
-        suscriptions = get_suscriptions(jwt)
-        update_db(suscriptions)
-        app.run(host='0.0.0.0', port=5000,use_reloader=False)
-    finally:
-        print("programa terminado!")
+    database = SqliteManager()
+    jwt = get_token()
+    suscriptions = get_suscriptions(jwt)
+    
+
