@@ -2,9 +2,14 @@ import jwt
 import json
 import requests
 from db_manager import SqliteManager
-tenant = 'd9c08603-4039-4b7d-8afe-29ff53ef06f8'
+from dotenv import load_dotenv
+import os
+load_dotenv()
+tenant = os.getenv("TENANT_ID")
+api_url = os.getenv("API_URL")
+api_port = os.getenv("API_PORT")
 def get_token():
-    url = "http://localhost:3000/api/auth/login"
+    url = f"http://{api_url}:{api_port}/api/auth/login"
 
     payload = json.dumps({
     "email": "jhondoe@email.com",
@@ -26,7 +31,7 @@ def get_token():
     return token
 
 def get_users(token):
-    url = "http://localhost:3000/api/users"
+    url = f"http://{api_url}:{api_port}/api/users"
 
     payload = {}
     headers = {
@@ -50,7 +55,7 @@ def get_users(token):
 
 
 def get_suscriptions(token):
-    url = "http://localhost:3000/api/user-subscriptions"
+    url = f"http://{api_url}:{api_port}/api/user-subscriptions"
     headers = {
         'x-tenant-id': tenant,
         'Authorization': f'Bearer {token}',
