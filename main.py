@@ -33,13 +33,13 @@ def get_token():
 
     return token
 
-def get_users(token):
+def get_users():
     url = f"http://{api_url}:{api_port}/api/users"
 
     payload = {}
     headers = {
     'x-tenant-id':tenant,
-    'Authorization': f'Bearer {token}',
+    'Authorization': f'Bearer {jwt}',
     'Content-Type': 'application/json',
     'Accept': 'application/json'
     }
@@ -57,11 +57,11 @@ def get_users(token):
         return []
 
 
-def get_suscriptions(token):
+def get_suscriptions():
     url = f"http://{api_url}:{api_port}/api/user-subscriptions"
     headers = {
         'x-tenant-id': tenant,
-        'Authorization': f'Bearer {token}',
+        'Authorization': f'Bearer {jwt}',
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
@@ -79,6 +79,18 @@ def get_suscriptions(token):
         print(f"Error en la solicitud: {response.status_code}")
         return []
 def validate_with_backend(user_id):
+    url = f"http://{api_url}:{api_port}/api/user-subscriptions/{user_id}"
+    headers = {
+        'x-tenant-id': tenant,
+        'Authorization': f'Bearer {jwt}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    response = requests.get(url, headers=headers)
+    data = response.json()  # Convertir la respuesta a JSON
+    user_find = data.get('result') 
+    #falta validar la fecha 
+    print(user_find)
     return False
     
 def update_db(suscriptions):
@@ -111,16 +123,24 @@ def validate_suscription():
         try:
             id_target = data['user_id']
             data_exist = database.get_subscription_by_user_id(id_target)
-            fecha_objetivo = parser.isoparse(data_exist['end_date'])
-            fecha_actual = datetime.now(timezone.utc)
-            if fecha_actual <= fecha_objetivo:
-                return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":True}), 200
+            if data_exist != None:
+                fecha_objetivo = parser.isoparse(data_exist['end_date'])
+                fecha_actual = datetime.now(timezone.utc)
+                if fecha_actual <= fecha_objetivo:
+                    return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":True}), 200
+                else:
+                    flag = validate_with_backend(id_target)
+                    if flag:
+                        return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":True}), 200
+                    else:
+                        return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":False}), 200
             else:
-                flag = validate_with_backend()
+                flag = validate_with_backend(id_target)
                 if flag:
                     return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":True}), 200
                 else:
                     return jsonify({"message": "Operación realizada con éxito", "status": 200,"access":False}), 200
+                
             
         except Exception as e:
             abort(500, description=f"Error al ejecutar la operación: {str(e)}")
@@ -134,7 +154,7 @@ if __name__ == "__main__":
         api_port = os.getenv("API_PORT")
         database = SqliteManager()
         jwt = get_token()
-        suscriptions = get_suscriptions(jwt)
+        suscriptions = get_suscriptions()
         update_db(suscriptions)
         app.run(host='0.0.0.0', port=5000,use_reloader=False)
     finally:
