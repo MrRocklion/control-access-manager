@@ -87,11 +87,18 @@ def validate_with_backend(user_id):
         'Accept': 'application/json'
     }
     response = requests.get(url, headers=headers)
-    data = response.json()  # Convertir la respuesta a JSON
-    user_find = data.get('result') 
-    #falta validar la fecha 
-    print(user_find)
-    return False
+    back_response = response.json()  # Convertir la respuesta a JSON
+    data = back_response.get('result')
+    print(data)
+    if data != None:
+        print('ENTRO EN ESTE CASO')
+        fecha_objetivo = parser.isoparse(data['end_date'])
+        fecha_actual = datetime.now(timezone.utc)
+        if fecha_actual <= fecha_objetivo:
+            return True
+        else:
+            return False     
+
     
 def update_db(suscriptions):
     for _sub in suscriptions:
@@ -109,6 +116,12 @@ def home():
     result = None
     return render_template('home.html', result=result)
 
+
+@app.route('/api/update', methods=['GET'])
+def update_sucriptions_db():
+    suscriptions = get_suscriptions()
+    update_db(suscriptions)
+    return jsonify({"message": "UPDATE realizado con éxito", "status": 200}), 200
 
 
 @app.route('/api/validate', methods=['POST'])
