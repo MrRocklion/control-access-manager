@@ -25,14 +25,12 @@ class Manager(threading.Thread):
 
     def run(self):
         self.jwt = self.get_token()
-        self.update_db_from_backend()
 
-        # Hilo para actualizar suscripciones cada 7 horas
         def periodic_subscription_update():
             while not self.stop_event.is_set():
                 try:
-                    print("[SubsUpdater] Esperando 7 horas para la próxima actualización...")
-                    time.sleep(7 * 60 * 60)  # 7 horas en segundos
+                    print("[SubsUpdater] Esperando 15 horas para la próxima actualización...")
+                    time.sleep(15 * 60 * 60)  # 7 horas en segundos
 
                     print("[SubsUpdater] Actualizando token y suscripciones...")
                     self.jwt = self.get_token()
@@ -149,7 +147,7 @@ class Manager(threading.Thread):
 
         try:
             response = requests.get(url, headers=headers)
-            if response.status_code == 200:
+            if response.status_code == 201:
                 data = response.json().get('result')
                 if data and 'end_date' in data and data['end_date']:
                     end_date = parser.isoparse(data['end_date'])
