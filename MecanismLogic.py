@@ -25,7 +25,7 @@ class Manager(threading.Thread):
 
     def run(self):
         self.jwt = self.get_token()
-
+        self.update_db_from_backend()
         def periodic_subscription_update():
             while not self.stop_event.is_set():
                 try:
