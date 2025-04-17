@@ -9,6 +9,21 @@ from rs232 import rs232Comunication
 import threading
 app = Flask(__name__)
 stop_event = threading.Event()
+
+@app.route('/api/hmi', methods=['POST'])
+def api_hmi():
+    data = request.json
+    action = data.get("action")
+    if action == "generate_pass":
+        manager.generate_pass()
+        return jsonify({"message": "Sistema genera Pase"})
+    elif action == "update":
+        manager.update_db_from_backend()
+        return jsonify({"message": "Actualizando sistema"})
+    else:
+        return jsonify({"message": "Acción no reconocida"}), 400
+
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     result = None
