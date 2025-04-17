@@ -27,7 +27,7 @@ def api_hmi():
 @app.route('/', methods=['GET', 'POST'])
 def home():
     result = None
-    return render_template('home.html', result=result)
+    return render_template('index.html', result=result)
 if __name__ == "__main__":
     try:
         load_dotenv(dotenv_path=".env", override=True)
