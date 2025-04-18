@@ -21,11 +21,10 @@ class Manager(threading.Thread):
         self.user_name = user_name
         self.pass_word = pass_word
         self.database = SqliteManager()
-
-
     def run(self):
         self.jwt = self.get_token()
         self.update_db_from_backend()
+        self.update_db_admin_from_backend()
         def periodic_subscription_update():
             while not self.stop_event.is_set():
                 try:
@@ -35,6 +34,7 @@ class Manager(threading.Thread):
                     print("[SubsUpdater] Actualizando token y suscripciones...")
                     self.jwt = self.get_token()
                     self.update_db_from_backend()
+                    self.update_db_admin_from_backend()
                     print("[SubsUpdater] Actualización completada correctamente.")
 
                 except Exception as e:
@@ -42,8 +42,6 @@ class Manager(threading.Thread):
 
         updater_thread = threading.Thread(target=periodic_subscription_update, daemon=True)
         updater_thread.start()
-
-        # Hilo principal de lectura RS232
         while not self.stop_event.is_set():
             with self.rs232.lock:
                 if self.pending_passes > 0:
@@ -55,6 +53,38 @@ class Manager(threading.Thread):
 
     def generate_pass(self):
         self.pending_passes += 1
+    
+    def update_db_admin_from_backend(self):
+        url = f"{self.api_url}/api/users/admins"
+        headers = {
+            'x-tenant-id': self.tenant,
+            'Authorization': f'Bearer {self.jwt}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code != 200:
+                print(f"Error en la solicitud: {response.status_code}")
+                return
+            admins = response.json().get('result', [])
+            for admin in admins:
+                formatted_admin = {
+                    "admin_id": admin['id'],
+                    "name": admin['name'],
+                    "lastname": admin['lastname'],
+                    "email": admin['email'],
+                    "account_type": admin['account_type']['name']
+                }
+                existing_data = self.database.get_admin_by_id(formatted_admin['admin_id'])
+                if existing_data:
+                    pass
+                else:
+                    print("No existe, registrando nuevo administrador.")
+                    self.database.insert_admin(formatted_admin)
+        except Exception as e:
+            print(f"Error al obtener o actualizar administradores: {e}")
+
 
     def update_db_from_backend(self):
         url = f"{self.api_url}/api/user-subscriptions"
@@ -82,7 +112,6 @@ class Manager(threading.Thread):
                 }
                 existing_data = self.database.get_subscription_by_user_id(formatted_sub['user_id'])
                 if existing_data:
-                    print("Ya existe, actualizando fechas.")
                     self.database.update_subscription_dates(
                         formatted_sub['user_id'],
                         formatted_sub['start_date'],
@@ -147,7 +176,7 @@ class Manager(threading.Thread):
 
         try:
             response = requests.get(url, headers=headers)
-            if response.status_code == 201:
+            if response.status_code == 200:
                 data = response.json().get('result')
                 if data and 'end_date' in data and data['end_date']:
                     end_date = parser.isoparse(data['end_date'])
@@ -164,22 +193,31 @@ class Manager(threading.Thread):
     def check_and_open_turnstile(self, user_data):
         try:
             user_id = user_data['user_id']
-            subscription = self.database.get_subscription_by_user_id(user_id)
-
-            if subscription and 'end_date' in subscription:
-                end_date = parser.isoparse(subscription['end_date'])
-                if datetime.now(timezone.utc) <= end_date:
-                    print("Tiene suscripción vigente (local).")
-                    self.open_turnstile()
-                    self.rs232.validation = False
-                    self.rs232.data = None
-                    return True
-
-            print("Verificando con backend...")
-            if self.validate_with_backend(user_id):
+            if self.database.get_admin_by_id(user_id) == False:
+                subscription = self.database.get_subscription_by_user_id(user_id)
+                print(subscription)
+                if subscription != None:
+                    if subscription and 'end_date' in subscription:
+                        end_date = parser.isoparse(subscription['end_date'])
+                        if datetime.now(timezone.utc) <= end_date:
+                            print("Tiene suscripción vigente (local).")
+                            self.open_turnstile()
+                            self.rs232.validation = False
+                            self.rs232.data = None
+                            return True
+                
+                else:
+                    print("Verificando con backend...")
+                    if self.validate_with_backend(user_id):
+                        self.open_turnstile()
+                        self.rs232.validation = False
+                        self.rs232.data = None
+                        return True
+            else:
                 self.open_turnstile()
                 self.rs232.validation = False
                 self.rs232.data = None
+                print("Acceso permitido para administrador y instructor")
                 return True
 
         except Exception as e:

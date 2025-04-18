@@ -1,24 +1,32 @@
 import sqlite3
-import threading
-from datetime import datetime
-import json
 
 
-class SqliteManager(threading.Thread):
+
+class SqliteManager():
     def __init__(self):
         super().__init__()
         self.create_tables()
 
     def create_tables(self):
         sql_statements = [ 
-            """ CREATE TABLE IF NOT EXISTS suscripciones (
+            """ CREATE TABLE IF NOT EXISTS subscriptions (
                 id INTEGER PRIMARY KEY,
                 start_date TEXT,
                 end_date TEXT,
                 duration INTEGER,
                 entries INTEGER,
                 user_id INTEGER
-            );"""
+            );
+            """,
+            """ CREATE TABLE IF NOT EXISTS staff_members  (
+                id INTEGER PRIMARY KEY,
+                admin_id INTEGER,
+                name TEXT,
+                lastname TEXT,
+                email TEXT,
+                account_type TEXT
+            );
+            """
         ]
 
         try:
@@ -38,7 +46,7 @@ class SqliteManager(threading.Thread):
                 
                 # Insertar los datos de la suscripción en la tabla
                 cursor.execute('''
-                    INSERT INTO suscripciones (start_date, end_date, duration, entries, user_id)
+                    INSERT INTO subscriptions (start_date, end_date, duration, entries, user_id)
                     VALUES (?, ?, ?, ?, ?)
                 ''', (
                     params['start_date'],
@@ -52,15 +60,34 @@ class SqliteManager(threading.Thread):
                 print("Suscripción insertada correctamente.")
         except sqlite3.Error as e:
             print("Error al insertar la suscripción:", e)
+    def insert_admin(self, params):
+        try:
+            with sqlite3.connect('app.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO staff_members (admin_id, name, lastname, email,account_type)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    params['admin_id'],
+                    params['name'],
+                    params['lastname'],
+                    params['email'],
+                    params['account_type']
+                ))
+
+                conn.commit()
+                print("Admin insertado correctamente.")
+        except sqlite3.Error as e:
+            print("Error al insertar la administracion", e)
 
     def get_subscription_by_user_id(self, user_id):
-        """Busca en la tabla suscripciones la fila que coincida con el user_id proporcionado."""
+        """Busca en la tabla subscriptions la fila que coincida con el user_id proporcionado."""
         try:
             with sqlite3.connect('app.db') as conn:
                 cursor = conn.cursor()
                 
                 cursor.execute('''
-                    SELECT * FROM suscripciones WHERE user_id = ?
+                    SELECT * FROM subscriptions WHERE user_id = ?
                 ''', (user_id,))
                 
                 subscription = cursor.fetchone()  # Obtener la primera coincidencia
@@ -82,6 +109,23 @@ class SqliteManager(threading.Thread):
         except sqlite3.Error as e:
             print("Error al buscar la suscripción:", e)
             return False
+    def get_admin_by_id(self, admin_id):
+        """Busca en la tabla admin la fila que coincida con el admin_id proporcionado."""
+        try:
+            with sqlite3.connect('app.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT * FROM staff_members WHERE admin_id = ?
+                ''', (admin_id,))
+                admin_data = cursor.fetchone()  # Obtener la primera coincidencia
+                if admin_data:
+                    return True
+                else:
+                    return False
+
+        except sqlite3.Error as e:
+            print("Error al buscar la suscripción:", e)
+            return False
     def update_subscription_dates(self, subscription_id, new_start_date, new_end_date):
         """Actualiza start_date y end_date en la suscripción con el ID proporcionado."""
         try:
@@ -89,7 +133,7 @@ class SqliteManager(threading.Thread):
                 cursor = conn.cursor()
                 
                 cursor.execute('''
-                    UPDATE suscripciones 
+                    UPDATE subscriptions 
                     SET start_date = ?, end_date = ? 
                     WHERE id = ?
                 ''', (new_start_date, new_end_date, subscription_id))
