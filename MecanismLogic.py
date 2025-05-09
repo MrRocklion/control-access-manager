@@ -40,20 +40,29 @@ class Manager(threading.Thread):
         self.update_db_from_backend()
         self.update_db_admin_from_backend()
 
+       
         def periodic_subscription_update():
+            updated_today = False  # bandera para evitar múltiples actualizaciones en una misma madrugada
+
             while not self.stop_event.is_set():
-                try:
-                    logger.info("[SubsUpdater] Esperando 15 horas para la próxima actualización...")
-                    time.sleep(15 * 60 * 60)
+                now = datetime.datetime.now()
+                hour = now.hour
 
-                    logger.info("[SubsUpdater] Actualizando token y suscripciones...")
-                    self.jwt = self.get_token()
-                    self.update_db_from_backend()
-                    self.update_db_admin_from_backend()
-                    logger.info("[SubsUpdater] Actualización completada correctamente.")
+                if 2 <= hour < 3 and not updated_today:
+                    try:
+                        logger.info("[SubsUpdater] Iniciando actualización programada entre 2 y 3 a.m.")
+                        self.jwt = self.get_token()
+                        self.update_db_from_backend()
+                        self.update_db_admin_from_backend()
+                        logger.info("[SubsUpdater] ✅ Actualización completada correctamente.")
+                        updated_today = True
+                    except Exception as e:
+                        logger.error(f"[SubsUpdater] ❌ Error durante actualización: {e}")
 
-                except Exception as e:
-                    logger.error(f"[SubsUpdater] ❌ Error durante actualización periódica: {e}")
+                elif hour >= 3:
+                    updated_today = False  # resetea la bandera para la próxima madrugada
+
+                time.sleep(60)  # espera 1 minuto antes de revisar otra vez
 
         updater_thread = threading.Thread(target=periodic_subscription_update, daemon=True)
         updater_thread.start()
@@ -166,12 +175,12 @@ class Manager(threading.Thread):
         }
         try:
             response = requests.post(url, headers=headers, data=payload)
-            logger.debug(response)
+            logger.info(response)
             if response.status_code == 201:
                 data = response.json()
                 return data['result']['token']
             else:
-                logger.warning(f"Error al obtener token: {response.status_code}")
+                logger.info(f"Error al obtener token: {response.status_code}")
         except Exception as e:
             logger.error(f"Excepción al obtener token: {e}")
         return ''
@@ -204,7 +213,7 @@ class Manager(threading.Thread):
             user_id = user_data['user_id']
             if not self.database.get_admin_by_id(user_id):
                 subscription = self.database.get_subscription_by_user_id(user_id)
-                logger.debug(subscription)
+                logger.info(subscription)
                 if subscription:
                     if 'end_date' in subscription:
                         end_date = parser.isoparse(subscription['end_date'])
@@ -217,6 +226,7 @@ class Manager(threading.Thread):
                         else:
                             logger.info("Parece que caducó su suscripción. Verificaremos con el backend.")
                             if self.validate_with_backend(user_id):
+                                logger.info("ABRIMOS EL TORNIQUETE")
                                 self.open_turnstile()
                                 self.rs232.validation = False
                                 self.rs232.data = None
