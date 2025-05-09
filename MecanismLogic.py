@@ -36,16 +36,12 @@ class Manager(threading.Thread):
         self.database = SqliteManager()
 
     def run(self):
-        self.jwt = self.get_token()
-        self.update_db_from_backend()
-        self.update_db_admin_from_backend()
-
-       
+        self.jwt = self.get_token()       
         def periodic_subscription_update():
             updated_today = False  # bandera para evitar múltiples actualizaciones en una misma madrugada
 
             while not self.stop_event.is_set():
-                now = datetime.datetime.now()
+                now = datetime.now()
                 hour = now.hour
 
                 if 2 <= hour < 3 and not updated_today:
