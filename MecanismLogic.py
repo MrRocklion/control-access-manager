@@ -2,7 +2,6 @@ import threading
 import requests
 import json
 import logging
-from gpiosManager import GpiosManager
 from dateutil import parser
 from datetime import datetime, timezone
 from db_manager import SqliteManager
@@ -19,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-gpios = GpiosManager()
+
 
 class Manager(threading.Thread):
     def __init__(self, rs232, stop_event, api_url, api_port, tenant, user_name, pass_word):
@@ -50,10 +49,10 @@ class Manager(threading.Thread):
                         self.jwt = self.get_token()
                         self.update_db_from_backend()
                         self.update_db_admin_from_backend()
-                        logger.info("[SubsUpdater] ✅ Actualización completada correctamente.")
+                        logger.info("[SubsUpdater] Actualización completada correctamente.")
                         updated_today = True
                     except Exception as e:
-                        logger.error(f"[SubsUpdater] ❌ Error durante actualización: {e}")
+                        logger.error(f"[SubsUpdater] Error durante actualización: {e}")
 
                 elif hour >= 3:
                     updated_today = False  # resetea la bandera para la próxima madrugada
@@ -201,8 +200,21 @@ class Manager(threading.Thread):
             logger.error(f"Error validando con backend: {e}")
         return False
 
-    def open_turnstile(self):
-        gpios.turnstileOpen()
+    def open_turnstile():
+        url = 'http://localhost:8000/normal'  # Cambia a la IP/host y puerto correcto si es remoto
+        try:
+            response = requests.post(url)
+            if response.status_code == 200:
+                data = response.json()
+                print(f"Respuesta del servidor: {data['mensaje']}")
+                return data
+            else:
+                print(f"Error: Código de estado {response.status_code}")
+                print(f"Detalle: {response.text}")
+                return None
+        except requests.exceptions.RequestException as e:
+            print(f"Error al conectar con el servidor: {e}")
+            return None
 
     def check_and_open_turnstile(self, user_data):
         try:
